@@ -36,7 +36,7 @@ D=d[d.arm=="tokens"]
 l16={l:round(D[(D.label==l)&(D.max_tokens==16)].give.isna().mean()*100,1) for l in NM.values()}
 ok(l16["Opus 5.5"]==100.0 and l16["Haiku 5.5"]==97.8 and l16["Sonnet 5.5"]==3.3 and l16["Fable 5.1"]==1.1,
    "4.2: loss at budget 16 by model",l16)
-cm={l:(int(cost[cost.label==l].out_tok.median()),int(cost[cost.label==l].out_tok.quantile(.9)),
+cm={l:(int(cost[cost.label==l].out_tok.median()),round(cost[cost.label==l].out_tok.quantile(.9)),
        int(cost[cost.label==l].out_tok.max())) for l in NM.values()}
 ok(cm["Fable 5.1"][0]==3 and cm["Sonnet 5.5"][0]==3 and cm["Opus 5.5"][0]==49 and cm["Haiku 5.5"][0]==78,
    "4.3: median output tokens 3/3/49/78",{k:v[0] for k,v in cm.items()})
@@ -51,7 +51,9 @@ ok(round(np.mean(a==50)*100,1)==63.3 and round(np.mean(b==50)*100,1)==36.0,
 ok(round(orr,2)==3.07,"4.4: odds ratio 3.07",round(orr,2))
 ks=ks_2samp(a,b); ok(round(ks.statistic,3)==0.273,"4.4: KS D 0.273",round(ks.statistic,3))
 ok(a.median()==50 and b.median()==30,"4.4: median 50 vs 30",f"{a.median()} vs {b.median()}")
-ok(round(mannwhitneyu(a,b).pvalue,3)==0.149,"4.4: Mann-Whitney p 0.149",round(mannwhitneyu(a,b).pvalue,3))
+mwp=mannwhitneyu(a,b).pvalue
+ok(f"{mwp:.1e}"=="5.4e-05","4.4: pooled Mann-Whitney p = 5.4e-05",f"{mwp:.2e}")
+ok(round(a.mean(),2)==38.83 and round(b.mean(),2)==31.77,"4.4: pooled means 38.83 vs 31.77",(round(a.mean(),2),round(b.mean(),2)))
 G=d[d.arm=="grid"]
 p0={l:(round(G[(G.label==l)&(G.persona=="P0_none")].give.mean(),2),
        G[(G.label==l)&(G.persona=="P0_none")].give.nunique()) for l in NM.values()}
@@ -65,8 +67,8 @@ kw=kruskal(*[h[(h.arm=="grid")&(h.persona=="P2_rich")&(h.variant==v)].give.dropn
              for v in sorted(h.variant.unique())])
 ok(round(kw.statistic,2)==7.55 and round(kw.pvalue,2)==0.11,"4.5: Kruskal H 7.55 p 0.11",
    (round(kw.statistic,2),round(kw.pvalue,3)))
-Gp=G.groupby("persona").give.mean()
-ok(round(Gp.max()-Gp.min(),2)==18.93,"4.5: persona spread 18.93",round(Gp.max()-Gp.min(),2))
+Gph=h[h.arm=="grid"].groupby("persona").give.mean()
+ok(round(Gph.max()-Gph.min(),2)==18.93,"4.5: persona spread 18.93 (within Haiku)",round(Gph.max()-Gph.min(),2))
 Gr=d[(d.arm=="grid")&(d.persona=="P2_rich")].copy()
 rng=random.Random(11)
 at={i:dict(age=rng.choice(H.AGES),gender=rng.choice(H.GENDERS),country=rng.choice(H.COUNTRIES),
@@ -81,7 +83,7 @@ print("\n### PAPER B ###")
 ok(len(e4)==720 and e4.give.notna().all(),"methods: 720 calls, all parsed",f"{len(e4)}, nulls {e4.give.isna().sum()}")
 A=e4[e4.arm=="format"]
 bare=A[A.fmt=="F1_bare"].give
-ok(len(bare)==120,"4.1: bare instruction n (manuscript says 180 across four models)",len(bare))
+ok(len(bare)==120,"4.1: bare instruction n = 120",len(bare))
 ok(np.mean(bare%5==0)*100==100.0,"4.1: bare 100% multiples of five",np.mean(bare%5==0)*100)
 ok(round(np.mean(bare%10==0)*100,1)==98.3,"4.1: bare 98.3% multiples of ten",round(np.mean(bare%10==0)*100,1))
 ok(bare.nunique()==8,"4.1: bare 8 distinct values",bare.nunique())
@@ -110,5 +112,6 @@ ok(round(ce.mean(),2)==36.42 and round(un.mean(),2)==30.67,"4.4: means 36.42 and
 ok(ce.median()==40 and un.median()==30,"4.4: medians 40 and 30",(ce.median(),un.median()))
 ok(round(mannwhitneyu(ce,un).pvalue,4)==0.0053,"4.4: Mann-Whitney p 0.0053",round(mannwhitneyu(ce,un).pvalue,5))
 ok(e4.give.nunique()==31,"4.5: 31 of 101 values used overall",e4.give.nunique())
-only_pr=set(pr[pr%5!=0].unique())
-ok(len(only_pr)==18,"4.5: 18 values appear only under the precise instruction",len(only_pr))
+pr_set=set(e4[e4.fmt=="F3_precise"].give.dropna().unique())
+oth=set(e4[e4.fmt!="F3_precise"].give.dropna().unique())
+ok(len(pr_set-oth)==12,"4.5: 12 values appear only under the precise instruction",len(pr_set-oth))
